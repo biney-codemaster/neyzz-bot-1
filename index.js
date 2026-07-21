@@ -1,36 +1,21 @@
 require("dotenv").config();
 
-const nodeMajor = Number(process.versions.node.split(".")[0]);
-if (Number.isNaN(nodeMajor) || nodeMajor < 18) {
+var Discord = require("discord.js");
+var fetch = require("node-fetch");
+
+var TOKEN = process.env.DISCORD_TOKEN;
+var PREFIX = "+";
+
+if (!TOKEN) {
   console.error(
-    `Node ${process.version} est trop vieux. Sur HostMaster, mets Node 18 ou 20 (pas 12), puis relance.`
+    "DISCORD_TOKEN manquant. Crée un fichier .env avec DISCORD_TOKEN=ton_token"
   );
   process.exit(1);
 }
 
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+var client = new Discord.Client();
 
-const TOKEN = process.env.DISCORD_TOKEN;
-const PREFIX = "+";
-
-if (!TOKEN) {
-  console.error("DISCORD_TOKEN manquant. Crée un fichier .env avec DISCORD_TOKEN=... ou mets la variable dans le panel.");
-  process.exit(1);
-}
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
-});
-
-/**
- * Types nekobot "hard" / explicites.
- * Pondération plus forte sur le réel (ass, boobs, pussy, anal, gonewild, 4k, pgif).
- */
-const NEKOBOT_POOL = [
+var NEKOBOT_POOL = [
   "ass",
   "ass",
   "ass",
@@ -56,7 +41,7 @@ const NEKOBOT_POOL = [
   "paizuri",
 ];
 
-const REDDIT_SUBS = [
+var REDDIT_SUBS = [
   "nsfw",
   "RealGirls",
   "gonewild",
@@ -78,140 +63,195 @@ const REDDIT_SUBS = [
   "nsfwcosplay",
 ];
 
-const IMAGE_EXT = /\.(jpe?g|png|gif|webp)(\?.*)?$/i;
-const cooldowns = new Map();
-const COOLDOWN_MS = 2500;
+var IMAGE_EXT = /\.(jpe?g|png|gif|webp)(\?.*)?$/i;
+var cooldowns = new Map();
+var COOLDOWN_MS = 2500;
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-async function fetchJson(url, options = {}) {
-  const res = await fetch(url, {
-    ...options,
+function fetchJson(url) {
+  return fetch(url, {
     headers: {
       "User-Agent": "neyzz-nsfw-bot/1.0 (Discord bot)",
       Accept: "application/json",
-      ...(options.headers || {}),
     },
+  }).then(function (res) {
+    if (!res.ok) {
+      throw new Error("HTTP " + res.status + " for " + url);
+    }
+    return res.json();
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.json();
 }
 
-async function fromNekobot() {
-  const type = pick(NEKOBOT_POOL);
-  const data = await fetchJson(`https://nekobot.xyz/api/image?type=${encodeURIComponent(type)}`);
-  if (!data?.success || typeof data.message !== "string") {
-    throw new Error(`nekobot/${type} empty`);
-  }
-  return { url: data.message, source: type };
+function fromNekobot() {
+  var type = pick(NEKOBOT_POOL);
+  return fetchJson(
+    "https://nekobot.xyz/api/image?type=" + encodeURIComponent(type)
+  ).then(function (data) {
+    if (!data || !data.success || typeof data.message !== "string") {
+      throw new Error("nekobot/" + type + " empty");
+    }
+    return { url: data.message, source: type };
+  });
 }
 
-async function fromReddit() {
-  const sub = pick(REDDIT_SUBS);
-  const sort = pick(["hot", "top"]);
-  const url = `https://www.reddit.com/r/${sub}/${sort}.json?limit=80&t=week`;
-  const data = await fetchJson(url);
-  const posts = (data?.data?.children || [])
-    .map((c) => c.data)
-    .filter((p) => {
-      if (!p || p.stickied || p.is_self || !p.url) return false;
-      return (
-        IMAGE_EXT.test(p.url) ||
-        p.url.includes("i.redd.it") ||
-        p.url.includes("i.imgur.com") ||
-        p.post_hint === "image" ||
-        Boolean(p.preview?.images?.[0]?.source?.url)
-      );
-    });
+function fromReddit() {
+  var sub = pick(REDDIT_SUBS);
+  var sort = pick(["hot", "top"]);
+  var url =
+    "https://www.reddit.com/r/" + sub + "/" + sort + ".json?limit=80&t=week";
 
-  if (!posts.length) throw new Error(`reddit r/${sub} empty`);
+  return fetchJson(url).then(function (data) {
+    var children =
+      data && data.data && data.data.children ? data.data.children : [];
+    var posts = children
+      .map(function (c) {
+        return c.data;
+      })
+      .filter(function (p) {
+        if (!p || p.stickied || p.is_self || !p.url) return false;
+        var previewUrl =
+          p.preview &&
+          p.preview.images &&
+          p.preview.images[0] &&
+          p.preview.images[0].source &&
+          p.preview.images[0].source.url;
+        return (
+          IMAGE_EXT.test(p.url) ||
+          p.url.indexOf("i.redd.it") !== -1 ||
+          p.url.indexOf("i.imgur.com") !== -1 ||
+          p.post_hint === "image" ||
+          Boolean(previewUrl)
+        );
+      });
 
-  const post = pick(posts);
-  let imageUrl = post.url;
+    if (!posts.length) {
+      throw new Error("reddit r/" + sub + " empty");
+    }
 
-  if (!IMAGE_EXT.test(imageUrl) && post.preview?.images?.[0]?.source?.url) {
-    imageUrl = post.preview.images[0].source.url.replace(/&amp;/g, "&");
-  }
+    var post = pick(posts);
+    var imageUrl = post.url;
+    var preview =
+      post.preview &&
+      post.preview.images &&
+      post.preview.images[0] &&
+      post.preview.images[0].source &&
+      post.preview.images[0].source.url;
 
-  if (imageUrl.includes("imgur.com") && !IMAGE_EXT.test(imageUrl) && !imageUrl.includes("i.imgur")) {
-    imageUrl = `https://i.imgur.com/${imageUrl.split("/").pop()}.jpg`;
-  }
+    if (!IMAGE_EXT.test(imageUrl) && preview) {
+      imageUrl = preview.replace(/&amp;/g, "&");
+    }
 
-  return {
-    url: imageUrl,
-    source: `r/${sub}`,
-    title: post.title?.slice(0, 180) || null,
-  };
+    if (
+      imageUrl.indexOf("imgur.com") !== -1 &&
+      !IMAGE_EXT.test(imageUrl) &&
+      imageUrl.indexOf("i.imgur") === -1
+    ) {
+      var parts = imageUrl.split("/");
+      imageUrl = "https://i.imgur.com/" + parts[parts.length - 1] + ".jpg";
+    }
+
+    return {
+      url: imageUrl,
+      source: "r/" + sub,
+      title: post.title ? String(post.title).slice(0, 180) : null,
+    };
+  });
 }
 
-async function getNsfwImage(attempts = 8) {
-  // ~80% nekobot (fiable), ~20% reddit (bonus si dispo)
-  const providers = [
+function getNsfwImage(attempts) {
+  attempts = attempts || 8;
+  var providers = [
     fromNekobot,
     fromNekobot,
     fromNekobot,
     fromNekobot,
     fromReddit,
   ];
+  var lastError = null;
+  var i = 0;
 
-  let lastError;
-  for (let i = 0; i < attempts; i++) {
-    const provider = pick(providers);
-    try {
-      const result = await provider();
-      if (result?.url) return result;
-    } catch (err) {
-      lastError = err;
+  function tryNext() {
+    if (i >= attempts) {
+      return Promise.reject(lastError || new Error("Aucune image trouvée"));
     }
+    i += 1;
+    var provider = pick(providers);
+    return provider()
+      .then(function (result) {
+        if (result && result.url) return result;
+        return tryNext();
+      })
+      .catch(function (err) {
+        lastError = err;
+        return tryNext();
+      });
   }
-  throw lastError || new Error("Aucune image trouvée");
+
+  return tryNext();
 }
 
-client.once("ready", () => {
-  console.log(`Connecté en tant que ${client.user.tag}`);
-  client.user.setActivity("+nsfw", { type: 3 });
+client.once("ready", function () {
+  console.log("Connecté en tant que " + client.user.tag);
+  client.user.setActivity("+nsfw", { type: "WATCHING" });
 });
 
-client.on("messageCreate", async (message) => {
+client.on("message", function (message) {
   if (message.author.bot || !message.guild) return;
 
-  const content = message.content.trim().toLowerCase();
-  if (content !== `${PREFIX}nsfw`) return;
+  var content = message.content.trim().toLowerCase();
+  if (content !== PREFIX + "nsfw") return;
 
-  const key = message.author.id;
-  const now = Date.now();
-  const until = cooldowns.get(key) || 0;
+  var key = message.author.id;
+  var now = Date.now();
+  var until = cooldowns.get(key) || 0;
   if (now < until) {
-    const wait = Math.ceil((until - now) / 1000);
-    return message.reply(`Attends encore ${wait}s avant de rerun +nsfw.`).catch(() => {});
+    var wait = Math.ceil((until - now) / 1000);
+    message
+      .reply("Attends encore " + wait + "s avant de rerun +nsfw.")
+      .catch(function () {});
+    return;
   }
   cooldowns.set(key, now + COOLDOWN_MS);
 
-  const loading = await message.channel.send("🔥 Je cherche une image de malade…").catch(() => null);
+  var loadingPromise = message.channel
+    .send("🔥 Je cherche une image de malade…")
+    .catch(function () {
+      return null;
+    });
 
-  try {
-    const image = await getNsfwImage();
+  loadingPromise.then(function (loading) {
+    return getNsfwImage()
+      .then(function (image) {
+        var footer =
+          image.source +
+          (image.title ? " · " + image.title : "") +
+          " · " +
+          message.author.username;
 
-    const embed = new EmbedBuilder()
-      .setColor(0xff2d55)
-      .setTitle("🔞 NSFW")
-      .setImage(image.url)
-      .setFooter({
-        text: `${image.source}${image.title ? ` · ${image.title}` : ""} · ${message.author.username}`,
+        var embed = new Discord.MessageEmbed()
+          .setColor(0xff2d55)
+          .setTitle("🔞 NSFW")
+          .setImage(image.url)
+          .setFooter(footer)
+          .setTimestamp();
+
+        return message.channel.send(embed);
       })
-      .setTimestamp();
-
-    await message.channel.send({ embeds: [embed] });
-  } catch (err) {
-    console.error("nsfw error:", err);
-    await message.channel
-      .send("❌ Impossible de récupérer une image pour le moment, réessaie.")
-      .catch(() => {});
-  } finally {
-    if (loading) loading.delete().catch(() => {});
-  }
+      .catch(function (err) {
+        console.error("nsfw error:", err);
+        return message.channel
+          .send("❌ Impossible de récupérer une image pour le moment, réessaie.")
+          .catch(function () {});
+      })
+      .then(function () {
+        if (loading) {
+          return loading.delete().catch(function () {});
+        }
+      });
+  });
 });
 
 client.login(TOKEN);
