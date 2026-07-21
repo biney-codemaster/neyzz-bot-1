@@ -44,17 +44,17 @@ npm start
 
 ## Usage
 
-Dans n’importe quel salon texte :
-
 ```
-+nsfw
++nsfw          → random hard
++nsfw bite     → gros penis
++nsfw seins    → gros seins
++nsfw chatte   → chattes
++nsfw cul      → gros culs
++nsfw anal     → anal
++nsfw gif      → gifs hard
++nsfw help     → liste des commandes
 ```
 
-## Sources
+Sources principales : Reddit hard (MassiveCock, hugeboobs, godpussy, bigasses…) + nekobot + n-sfw.
 
-Le bot pioche au hasard parmi :
-
-- **nekobot** : ass, boobs, pussy, gifs, 4k, etc.
-- **Reddit** : subs NSFW (gonewild, ass, boobs, pussy, …)
-
-Cooldown : 2,5 s par user pour éviter le spam.
+Cooldown : 2 s par user.
