@@ -1,12 +1,20 @@
 require("dotenv").config();
 
+const nodeMajor = Number(process.versions.node.split(".")[0]);
+if (Number.isNaN(nodeMajor) || nodeMajor < 18) {
+  console.error(
+    `Node ${process.version} est trop vieux. Sur HostMaster, mets Node 18 ou 20 (pas 12), puis relance.`
+  );
+  process.exit(1);
+}
+
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const PREFIX = "+";
 
 if (!TOKEN) {
-  console.error("DISCORD_TOKEN manquant. Copie .env.example vers .env et mets ton token.");
+  console.error("DISCORD_TOKEN manquant. Crée un fichier .env avec DISCORD_TOKEN=... ou mets la variable dans le panel.");
   process.exit(1);
 }
 

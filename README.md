@@ -41,6 +41,31 @@ DISCORD_TOKEN=ton_token_ici
 npm start
 ```
 
+## HostMaster (panel.code-master.xyz)
+
+Si tu as l’erreur `ts-node` / `fileExists` ou `Node v12` :
+
+1. Dans les **settings** du serveur HostMaster, change la version de **Node à 18 ou 20** (pas 12).
+2. Change la **commande de démarrage** en :
+   ```bash
+   node index.js
+   ```
+   (surtout pas `ts-node` — ce bot est en JavaScript, pas TypeScript)
+3. Crée un fichier `.env` à la racine :
+   ```
+   DISCORD_TOKEN=ton_token_ici
+   ```
+4. Dans la console : `npm install` puis clique **Start**.
+
+Alternative startup :
+```bash
+npm start
+```
+ou :
+```bash
+bash start.sh
+```
+
 ## Usage
 
 Dans n’importe quel salon texte :
