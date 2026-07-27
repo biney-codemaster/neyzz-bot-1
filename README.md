@@ -46,7 +46,7 @@ npm start
 
 ```
 +nsfw          → random hard
-+nsfw bite     → gros penis
++nsfw bite / zgeg  → gros penis
 +nsfw seins    → gros seins
 +nsfw chatte   → chattes
 +nsfw cul      → gros culs

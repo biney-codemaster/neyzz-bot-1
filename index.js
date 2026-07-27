@@ -101,6 +101,9 @@ var ALL_CATS = Object.keys(CATEGORIES);
 var ALIASES = {
   bite: "bite",
   bites: "bite",
+  zgeg: "bite",
+  zgegs: "bite",
+  zeg: "bite",
   penis: "bite",
   cock: "bite",
   dick: "bite",
@@ -283,7 +286,7 @@ function resolveCategory(arg) {
 
 client.once("ready", function () {
   console.log("Connecté en tant que " + client.user.tag);
-  client.user.setActivity("+nsfw | +nsfw bite/seins/chatte/cul", {
+  client.user.setActivity("+nsfw | +nsfw zgeg/seins/chatte/cul", {
     type: "WATCHING",
   });
 });
@@ -302,7 +305,7 @@ client.on("message", function (message) {
     message.channel
       .send(
         "**+nsfw** — random hard\n" +
-          "**+nsfw bite** — gros penis\n" +
+          "**+nsfw bite** / **+nsfw zgeg** — gros penis\n" +
           "**+nsfw seins** — gros seins\n" +
           "**+nsfw chatte** — chattes\n" +
           "**+nsfw cul** — gros culs\n" +
